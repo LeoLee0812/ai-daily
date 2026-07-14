@@ -49,3 +49,17 @@ vercel env ls            # 核对线上环境变量
 ## 环境变量
 
 `DEEPSEEK_API_KEY` `LLM_MODEL` `RESEND_API_KEY` `MAIL_TO` `CRON_SECRET` `BLOB_READ_WRITE_TOKEN`（Blob store 连接项目后自动注入，本地要用 `vercel env pull`）`SITE_URL`
+
+## 视频工作台（v3，逆向自橘鸦 AI 早报）
+
+- `/studio?key=ADMIN_KEY`：选素材（当日日报条目+实时信源，勾选≤10条）→ DeepSeek 生成口播稿（开场/逐事件/结尾+卡片要点）→ 逐句火山 TTS 定时间轴 → satori 卡片 + sharp 字幕帧 + ffmpeg 成片
+- **画面不走浏览器截图**：卡片用 satori(flexbox)+resvg 纯 Node 渲染，1920x1080 NotebookLM 风（米杏底 #F7F3EC + 玫红标题 #E0537A + 白底黑框要点卡），字幕预合成进帧，进度条用 ffmpeg overlay x 表达式
+- 字体：`assets/fonts/` 是 GB2312 子集化的 Noto Sans SC（1.8MB/枚），别删；next.config 的 `outputFileTracingIncludes` 带上了字体和 ffmpeg 二进制
+- 数据：Blob `videos/YYYY-MM-DD/`（job.json 状态机 script→audio→rendering→done + audio/*.mp3 + 成片/SRT）
+- 火山 TTS：V1 非流式 `openspeech.bytedance.com/api/v1/tts`，**Authorization 是 `Bearer;token` 分号分隔**，单请求≤300汉字所以按句拆分逐句合成，事件间隙 0.45s 静音在音频 concat 清单里补
+- `npm run render -- YYYY-MM-DD [--tts]`：线上 300s 超时跑不完时的本地渲染兜底（写回同一 Blob）
+- 旧 CSS 变量与 shadcn 撞名的已改 `--d-muted/--d-accent`；全局禁止再写未分层的 `* { margin:0 }`（会压过 Tailwind 工具类）
+
+### 新增环境变量（火山引擎语音合成）
+
+`VOLC_TTS_APP_ID` `VOLC_TTS_ACCESS_TOKEN` `VOLC_TTS_CLUSTER`(默认 volcano_tts) `VOLC_TTS_VOICE`(默认 BV700_V2_streaming) `VOLC_TTS_SPEED`(默认 1.0)
