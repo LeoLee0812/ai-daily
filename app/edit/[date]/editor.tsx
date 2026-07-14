@@ -78,7 +78,7 @@ export default function Editor({
             </strong>
           </div>
           <div
-            style={{ fontSize: 13, color: "var(--muted)", marginBottom: 8 }}
+            style={{ fontSize: 13, color: "var(--d-muted)", marginBottom: 8 }}
           >
             {it.body.slice(0, 120)}…
           </div>
@@ -134,7 +134,7 @@ export default function Editor({
         >
           定稿并发送邮件
         </button>
-        <span style={{ fontSize: 13, color: "var(--muted)" }}>{msg}</span>
+        <span style={{ fontSize: 13, color: "var(--d-muted)" }}>{msg}</span>
       </div>
     </div>
   );
