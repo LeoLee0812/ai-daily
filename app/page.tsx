@@ -5,6 +5,7 @@ import { listReportDates } from "@/lib/store";
 import { listJobDates } from "@/lib/studio/store";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { CalendarDays, Clapperboard, Mail, Sparkles } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,14 @@ export default async function Home() {
             <h1 className="text-3xl font-bold tracking-tight text-neutral-900">
               Leo 的 AI 日报
             </h1>
+            <Button
+              size="sm"
+              className="ml-auto bg-pink-600 hover:bg-pink-700"
+              render={<Link href="/studio" />}
+            >
+              <Clapperboard className="h-4 w-4" />
+              视频工作台
+            </Button>
           </div>
           <p className="text-sm leading-relaxed text-neutral-500">
             每天三分钟，看懂 AI 圈新鲜事
