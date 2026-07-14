@@ -5,3 +5,5 @@ node_modules/
 tmp/
 tsconfig.tsbuildinfo
 next-env.d.ts
+.vercel
+.env*
