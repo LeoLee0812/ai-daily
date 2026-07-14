@@ -60,6 +60,11 @@ vercel env ls            # 核对线上环境变量
 - `npm run render -- YYYY-MM-DD [--tts]`：线上 300s 超时跑不完时的本地渲染兜底（写回同一 Blob）
 - 旧 CSS 变量与 shadcn 撞名的已改 `--d-muted/--d-accent`；全局禁止再写未分层的 `* { margin:0 }`（会压过 Tailwind 工具类）
 
-### 新增环境变量（火山引擎语音合成）
+### TTS 供应商（可插拔，lib/studio/tts.ts）
 
-`VOLC_TTS_APP_ID` `VOLC_TTS_ACCESS_TOKEN` `VOLC_TTS_CLUSTER`(默认 volcano_tts) `VOLC_TTS_VOICE`(默认 BV700_V2_streaming) `VOLC_TTS_SPEED`(默认 1.0)
+- 选择逻辑：`TTS_PROVIDER` 显式指定 > 有 `SILICONFLOW_API_KEY` 用硅基流动 > 有 `DASHSCOPE_API_KEY` 用阿里百炼 qwen-tts > 火山
+- **硅基流动 CosyVoice2-0.5B**：付费里最便宜（¥0.05/千字符≈¥4.5/月），OpenAI 兼容接口，默认音色 `FunAudioLLM/CosyVoice2-0.5B:anna`
+- **百炼 qwen-tts**（已配线上，用千问 key）：返回 wav 链接，免费档限速狠（句间 1.2s 间隔+429 退避已内置），默认音色 Chelsie；`DASHSCOPE_TTS_MODEL` 可换 qwen3-tts-flash
+- 火山：`VOLC_TTS_APP_ID/ACCESS_TOKEN/CLUSTER`，`Bearer;token` 分号鉴权
+- 通用：`TTS_VOICE` 换音色、`TTS_SPEED` 语速；video.ts 会把各家音频统一转 44.1k 单声道 wav 再拼接，别假设 mp3
+- 2026-07-14 实测：qwen-tts 全链路出片成功（94.7s 视频，本地渲染 195s——线上 300s 限制对长视频偏紧，超时就 `npm run render`）

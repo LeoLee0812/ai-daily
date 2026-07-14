@@ -12,9 +12,13 @@ export async function POST(req: NextRequest) {
   if (!process.env.ADMIN_KEY || body.key !== process.env.ADMIN_KEY) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  if (!process.env.VOLC_TTS_APP_ID || !process.env.VOLC_TTS_ACCESS_TOKEN) {
+  const hasProvider =
+    process.env.SILICONFLOW_API_KEY ||
+    process.env.DASHSCOPE_API_KEY ||
+    (process.env.VOLC_TTS_APP_ID && process.env.VOLC_TTS_ACCESS_TOKEN);
+  if (!hasProvider) {
     return NextResponse.json(
-      { error: "未配置火山引擎 TTS（VOLC_TTS_APP_ID / VOLC_TTS_ACCESS_TOKEN）" },
+      { error: "未配置 TTS（SILICONFLOW_API_KEY / DASHSCOPE_API_KEY / 火山 VOLC_TTS_*，任一即可）" },
       { status: 500 },
     );
   }

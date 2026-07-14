@@ -18,7 +18,7 @@ async function main() {
   if (!job) throw new Error(`没有 ${date} 的视频任务，先在工作台生成口播稿`);
 
   if (withTts || !job.timeline) {
-    console.log("合成语音（火山引擎）…");
+    console.log("合成语音（TTS）…");
     job.timeline = await synthesizeScript(job.date, job.script);
     job.status = "audio";
     await saveJob(job);

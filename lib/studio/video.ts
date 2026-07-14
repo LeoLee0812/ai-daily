@@ -46,13 +46,16 @@ export async function renderVideo(job: VideoJob): Promise<{ videoUrl: string; sr
   const dir = await mkdtemp(path.join(os.tmpdir(), "aidaily-video-"));
 
   try {
-    // 1. 下载逐句音频
+    // 1. 下载逐句音频并统一转码成 44.1k 单声道 wav（抹平各 TTS 供应商的格式差异，concat 才安全）
     const audioFiles: string[] = [];
     for (let i = 0; i < tl.sentences.length; i++) {
       const res = await fetch(tl.sentences[i].audioUrl);
       if (!res.ok) throw new Error(`音频下载失败 ${i}: ${res.status}`);
-      const f = path.join(dir, `a${String(i).padStart(3, "0")}.mp3`);
-      await writeFile(f, Buffer.from(await res.arrayBuffer()));
+      const ext = tl.sentences[i].audioUrl.split(".").pop() ?? "mp3";
+      const raw = path.join(dir, `raw${String(i).padStart(3, "0")}.${ext}`);
+      await writeFile(raw, Buffer.from(await res.arrayBuffer()));
+      const f = path.join(dir, `a${String(i).padStart(3, "0")}.wav`);
+      await ffmpeg(["-y", "-i", raw, "-ar", "44100", "-ac", "1", "-c:a", "pcm_s16le", f], dir);
       audioFiles.push(f);
     }
 
@@ -112,10 +115,10 @@ export async function renderVideo(job: VideoJob): Promise<{ videoUrl: string; sr
         const gap = next.start - tl.sentences[i].end;
         if (gap > 0.05) {
           const key = gap.toFixed(3);
-          const silence = path.join(dir, `sil${key}.mp3`);
+          const silence = path.join(dir, `sil${key}.wav`);
           if (!gaps.has(key)) {
             await ffmpeg(
-              ["-f", "lavfi", "-i", `anullsrc=r=24000:cl=mono`, "-t", key, "-c:a", "libmp3lame", "-b:a", "64k", silence],
+              ["-f", "lavfi", "-i", `anullsrc=r=44100:cl=mono`, "-t", key, "-c:a", "pcm_s16le", silence],
               dir,
             );
             gaps.add(key);
@@ -146,7 +149,7 @@ export async function renderVideo(job: VideoJob): Promise<{ videoUrl: string; sr
           `[base][bar]overlay=x='-W+W*t/${total}':y=${CANVAS_H - 12}:shortest=1[v]`,
         "-map", "[v]", "-map", "1:a",
         "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-crf", "21",
-        "-c:a", "aac", "-b:a", "160k", "-ar", "24000",
+        "-c:a", "aac", "-b:a", "160k", "-ar", "44100",
         "-t", total,
         "-movflags", "+faststart",
         "out.mp4",
