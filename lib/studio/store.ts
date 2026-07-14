@@ -46,12 +46,12 @@ export async function putAsset(
   return url;
 }
 
-/** 列出有视频任务的日期（新的在前） */
+/** 列出已出片的日期（新的在前）——按成片 mp4 是否存在判断，草稿任务不算 */
 export async function listJobDates(): Promise<string[]> {
   const { blobs } = await list({ prefix: PREFIX, limit: 1000 });
   const dates = new Set<string>();
   for (const b of blobs) {
-    const m = b.pathname.match(/^videos\/(\d{4}-\d{2}-\d{2})\/job\.json$/);
+    const m = b.pathname.match(/^videos\/(\d{4}-\d{2}-\d{2})\/ai-daily-.*\.mp4$/);
     if (m) dates.add(m[1]);
   }
   return [...dates].sort().reverse();

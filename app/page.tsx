@@ -71,7 +71,10 @@ export default async function Home() {
         )}
 
         <footer className="mt-14 border-t pt-6 text-center text-xs text-neutral-400">
-          由 Leo 工具箱生成 · daily.saveme505.help
+          由 Leo 工具箱生成 · daily.saveme505.help ·{" "}
+          <Link href="/studio" className="hover:text-pink-600">
+            工作台
+          </Link>
         </footer>
       </div>
     </div>
