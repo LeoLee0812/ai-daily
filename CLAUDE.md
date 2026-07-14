@@ -9,11 +9,17 @@
 - 文案引擎 DeepSeek（`@ai-sdk/deepseek` + `generateObject`），模型 `deepseek-chat`。deepseek 对 json_schema 走兼容模式（schema 注入 system），会打 warning，属正常
 - 邮件直接 fetch Resend HTTP API（不引 SDK），发件人 `claude@saveme505.help`
 
-## 信源契约（必须遵守）
+## 信源（v2，已弃用 aihot）
 
-- **aihot.virxact.com**：与 media-studio 同一套限流契约——串行 ≥1.1s、429 退避 30-60s、自报 UA `ai-daily-sync/1.0 (+mailto:…)`、只用官方 JSON API 不爬 HTML
-- **HN Algolia**：`points>80` + AI 关键词，近 26h
+- **RSS**（`lib/sources.ts` 的 `FEEDS`）：OpenAI / Google AI / Google DeepMind 官方 + TechCrunch AI / The Verge AI / VentureBeat AI / 9to5Mac / Ars Technica（后两者 AI 关键词过滤）+ Simon Willison。自写极简解析器兼容 RSS 2.0 与 Atom，不引 XML 依赖。UA 必须是浏览器样式（blog.google 拒绝 bot UA）；Anthropic 官网无 RSS（404），靠媒体源覆盖
+- **HN Algolia**：`points>50` + AI 关键词，近 26h
 - 任一信源挂掉不阻塞整体（`Promise.allSettled`）；候选 <5 条时放弃生成返回 502
+- **两段式生成**：先选题（4-5 条+角度）→ 逐条 `fetchArticleText` 抓原文（≤9000 字符）并发深挖 → 汇总要点/小结。深度来自原文抓取，这是和"聚合器标题直接写"拉开差距的关键
+
+## 人工审核 + 长图（v2）
+
+- 报告有 `status: draft|final`。cron 只出草稿并发 [草稿待审] 邮件（带 `/edit/[date]?key=ADMIN_KEY` 按钮）；`/edit` 页逐条改点评/小结，「定稿并发送邮件」→ `/api/report/update`（POST，ADMIN_KEY 鉴权）→ status=final + 正式邮件
+- 长图导出：`/r/[date]` 右下角按钮，`html-to-image` 客户端 toPng（pixelRatio 2），`data-noexport` 元素会被过滤掉不进图
 
 ## Cron 与幂等
 

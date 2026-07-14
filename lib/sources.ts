@@ -1,86 +1,112 @@
-// 信源采集：aihot 精选流（中文 AI 热点聚合）+ Hacker News（Algolia 公开 API）
-// aihot 限流契约与 media-studio 保持一致：串行 ≥1.1s、自报 UA、429 退避、不爬 HTML
+// 信源采集 v2：官方博客/科技媒体 RSS + Hacker News，不再使用 aihot
+// 设计：模仿老卫日报的信源结构——一手官方公告 + 主流科技媒体 + 开发者社区热帖
 
 import type { Candidate } from "./types";
 
-const AIHOT_BASE = "https://aihot.virxact.com";
-const AIHOT_UA = "ai-daily-sync/1.0 (+mailto:1656839861un@gmail.com)";
-const MIN_INTERVAL_MS = 1150;
-let lastRequestAt = 0;
+// ---------- RSS ----------
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-async function throttle() {
-  const wait = lastRequestAt + MIN_INTERVAL_MS - Date.now();
-  if (wait > 0) await sleep(wait);
-  lastRequestAt = Date.now();
+interface Feed {
+  name: string;
+  url: string;
+  /** 是否只保留 AI 相关条目（综合媒体需要过滤，垂直源不用） */
+  aiFilter: boolean;
 }
 
-async function politeGet(path: string): Promise<unknown> {
-  const url = path.startsWith("http") ? path : `${AIHOT_BASE}${path}`;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await throttle();
-    const res = await fetch(url, {
-      headers: { "User-Agent": AIHOT_UA, Accept: "application/json" },
-      cache: "no-store",
-    });
-    if (res.status === 429) {
-      await sleep(30000 + (attempt + 1) * 12000);
-      continue;
-    }
-    if (!res.ok) throw new Error(`aihot 请求失败 ${res.status} ${url}`);
-    return res.json();
-  }
-  throw new Error(`aihot 多次 429，放弃 ${url}`);
+const FEEDS: Feed[] = [
+  // 一手官方
+  { name: "OpenAI", url: "https://openai.com/news/rss.xml", aiFilter: false },
+  { name: "Google AI", url: "https://blog.google/technology/ai/rss/", aiFilter: false },
+  { name: "Google DeepMind", url: "https://deepmind.google/blog/rss.xml", aiFilter: false },
+  // 科技媒体
+  { name: "TechCrunch AI", url: "https://techcrunch.com/category/artificial-intelligence/feed/", aiFilter: false },
+  { name: "The Verge AI", url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", aiFilter: false },
+  { name: "VentureBeat AI", url: "https://venturebeat.com/category/ai/feed/", aiFilter: false },
+  { name: "9to5Mac", url: "https://9to5mac.com/feed/", aiFilter: true },
+  { name: "Ars Technica", url: "https://feeds.arstechnica.com/arstechnica/index", aiFilter: true },
+  // 独立观察者（AI 工具实操视角，和日报「怎么玩」气质接近）
+  { name: "Simon Willison", url: "https://simonwillison.net/atom/everything/", aiFilter: false },
+];
+
+const AI_WORDS =
+  /\b(AI|LLM|GPT|Claude|Gemini|Grok|Copilot|OpenAI|Anthropic|DeepSeek|Qwen|Kimi|Llama|Mistral|agent|chatbot|Siri|machine.learning|neural|diffusion|transformer)\b/i;
+
+function stripTags(s: string): string {
+  return s
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-interface AihotItem {
-  title: string;
-  url?: string;
-  source?: string;
-  publishedAt?: string;
-  summary?: string;
+function pick(block: string, tag: string): string {
+  const m = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i"));
+  return m ? stripTags(m[1]) : "";
 }
 
-// 拉取 aihot 精选流最近条目（最多 2 页，防止 cron 超时）
-export async function fetchAihot(sinceIso: string): Promise<Candidate[]> {
+// 兼容 RSS 2.0 <item> 与 Atom <entry> 的极简解析
+function parseFeed(xml: string, feed: Feed, sinceMs: number): Candidate[] {
+  const blocks = xml.match(/<(item|entry)[\s>][\s\S]*?<\/\1>/gi) ?? [];
   const out: Candidate[] = [];
-  let cursor: string | undefined;
-  for (let page = 0; page < 2; page++) {
-    const params = new URLSearchParams({ mode: "selected", since: sinceIso });
-    if (cursor) params.set("cursor", cursor);
-    const j = (await politeGet(`/api/public/items?${params}`)) as {
-      items?: AihotItem[];
-      data?: AihotItem[];
-      nextCursor?: string | null;
-      hasNext?: boolean;
-    };
-    const batch = j.items ?? j.data ?? [];
-    for (const it of batch) {
-      out.push({
-        title: it.title,
-        summary: it.summary,
-        url: it.url,
-        source: it.source,
-        publishedAt: it.publishedAt,
-        from: "aihot",
-      });
+  for (const b of blocks) {
+    const title = pick(b, "title");
+    if (!title) continue;
+    // 链接：RSS <link>text</link>；Atom <link href="..."/>
+    let link = pick(b, "link");
+    if (!link) {
+      const m = b.match(/<link[^>]*href="([^"]+)"[^>]*\/?>(?![\s\S]*rel="replies")/i);
+      link = m ? m[1] : "";
     }
-    cursor = j.nextCursor ?? undefined;
-    if (j.hasNext === false || !cursor || batch.length === 0) break;
+    const dateStr =
+      pick(b, "pubDate") || pick(b, "updated") || pick(b, "published") || pick(b, "dc:date");
+    const ts = dateStr ? Date.parse(dateStr) : NaN;
+    if (!Number.isNaN(ts) && ts < sinceMs) continue;
+    const summary = (pick(b, "description") || pick(b, "summary") || pick(b, "content")).slice(0, 400);
+    if (feed.aiFilter && !AI_WORDS.test(title + " " + summary)) continue;
+    out.push({
+      title,
+      summary,
+      url: link || undefined,
+      source: feed.name,
+      publishedAt: dateStr || undefined,
+      from: "rss",
+    });
   }
-  return out;
+  return out.slice(0, 12); // 每个源最多 12 条，防止刷屏
 }
 
-// Hacker News：Algolia 公开搜索 API，取近 24h 高分 AI 相关帖
+async function fetchFeed(feed: Feed, sinceMs: number): Promise<Candidate[]> {
+  const res = await fetch(feed.url, {
+    // 部分站点（blog.google 等）会拒绝非浏览器 UA
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ai-daily/1.0",
+      Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
+    },
+    cache: "no-store",
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) throw new Error(`${feed.name} ${res.status}`);
+  return parseFeed(await res.text(), feed, sinceMs);
+}
+
+// ---------- Hacker News ----------
+
 export async function fetchHackerNews(sinceEpoch: number): Promise<Candidate[]> {
   const query =
-    "AI OR LLM OR GPT OR Claude OR Gemini OR OpenAI OR Anthropic OR agent";
+    "AI OR LLM OR GPT OR Claude OR Gemini OR Grok OR OpenAI OR Anthropic OR agent";
   const url =
     `https://hn.algolia.com/api/v1/search?tags=story&hitsPerPage=30` +
-    `&numericFilters=created_at_i>${sinceEpoch},points>80` +
+    `&numericFilters=created_at_i>${sinceEpoch},points>50` +
     `&query=${encodeURIComponent(query)}`;
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(12000),
+  });
   if (!res.ok) return [];
   const j = (await res.json()) as {
     hits: Array<{
@@ -93,7 +119,7 @@ export async function fetchHackerNews(sinceEpoch: number): Promise<Candidate[]> 
   };
   return j.hits.map((h) => ({
     title: h.title,
-    summary: `HN ${h.points} 分`,
+    summary: `Hacker News ${h.points} 分热帖`,
     url: h.url ?? `https://news.ycombinator.com/item?id=${h.objectID}`,
     source: "Hacker News",
     publishedAt: h.created_at,
@@ -101,16 +127,22 @@ export async function fetchHackerNews(sinceEpoch: number): Promise<Candidate[]> 
   }));
 }
 
-// 汇总候选素材（任一信源失败不阻塞整体）
+// ---------- 汇总 ----------
+
+// 全部信源并发拉取；任一失败不阻塞整体
 export async function collectCandidates(): Promise<Candidate[]> {
-  const since = new Date(Date.now() - 26 * 3600 * 1000);
-  const [aihot, hn] = await Promise.allSettled([
-    fetchAihot(since.toISOString()),
-    fetchHackerNews(Math.floor(since.getTime() / 1000)),
+  const since = Date.now() - 26 * 3600 * 1000;
+  const results = await Promise.allSettled([
+    ...FEEDS.map((f) => fetchFeed(f, since)),
+    fetchHackerNews(Math.floor(since / 1000)),
   ]);
   const out: Candidate[] = [];
-  if (aihot.status === "fulfilled") out.push(...aihot.value);
-  if (hn.status === "fulfilled") out.push(...hn.value);
+  const failed: string[] = [];
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") out.push(...r.value);
+    else failed.push(i < FEEDS.length ? FEEDS[i].name : "HN");
+  });
+  if (failed.length) console.warn("[ai-daily] 信源失败:", failed.join(", "));
   // 标题去重
   const seen = new Set<string>();
   return out.filter((c) => {
@@ -119,4 +151,36 @@ export async function collectCandidates(): Promise<Candidate[]> {
     seen.add(k);
     return true;
   });
+}
+
+// ---------- 原文抓取（第二段深挖用） ----------
+
+// 抓取选中条目的原文正文（去标签纯文本，截断防超长）
+export async function fetchArticleText(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) ai-daily/1.0",
+        Accept: "text/html",
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(15000),
+      redirect: "follow",
+    });
+    if (!res.ok) return "";
+    const html = await res.text();
+    // 去掉脚本/样式/导航后取正文文本
+    const cleaned = html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+      .replace(/<header[\s\S]*?<\/header>/gi, " ")
+      .replace(/<footer[\s\S]*?<\/footer>/gi, " ");
+    // 优先 <article>，否则全文
+    const article = cleaned.match(/<article[\s\S]*?<\/article>/i)?.[0] ?? cleaned;
+    return stripTags(article).slice(0, 9000);
+  } catch {
+    return "";
+  }
 }

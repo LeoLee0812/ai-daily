@@ -12,6 +12,7 @@
     "@ai-sdk/deepseek": "^2.0.0",
     "@vercel/blob": "^2.0.0",
     "ai": "^6.0.0",
+    "html-to-image": "^1.11.13",
     "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

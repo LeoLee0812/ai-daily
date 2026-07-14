@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { collectCandidates } from "@/lib/sources";
 import { generateReport } from "@/lib/generate";
 import { beijingToday, getReport, saveReport } from "@/lib/store";
-import { sendReportEmail } from "@/lib/email";
+import { sendDraftEmail } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 
   let mailed = true;
   try {
-    await sendReportEmail(report);
+    await sendDraftEmail(report);
   } catch (e) {
     mailed = false;
     console.error("[ai-daily] 邮件发送失败:", e);

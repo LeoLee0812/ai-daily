@@ -12,7 +12,7 @@
 - 线上地址：<https://daily.saveme505.help>
 - 每天北京时间 **09:30**（Vercel Cron `30 1 * * *` UTC）自动生成并发邮件
 
-## 工作流
+## 工作流（v2：两段式生成 + 人工审核）
 
 ```
 Vercel Cron（每日 09:30 北京时间）
@@ -21,19 +21,24 @@ Vercel Cron（每日 09:30 北京时间）
 /api/cron/daily（Bearer CRON_SECRET 鉴权，幂等：当天已有则跳过）
    │
    ├─ 1. 采集信源（lib/sources.ts）
-   │      · aihot.virxact.com 精选流（中文 AI 热点聚合，守限流契约）
+   │      · 官方一手 RSS：OpenAI / Google AI / Google DeepMind
+   │      · 科技媒体 RSS：TechCrunch AI / The Verge AI / VentureBeat AI /
+   │        9to5Mac(AI过滤) / Ars Technica(AI过滤) / Simon Willison
    │      · Hacker News Algolia API（近 24h 高分 AI 帖）
    │
-   ├─ 2. 生成日报（lib/generate.ts）
-   │      DeepSeek generateObject 结构化输出：
-   │      今日要点 4-6 条 + 正文条目 4-5 个（正文/怎么玩/链接/Leo 点评）+ 今日小结
-   │      链接只允许取自素材，不许编造
+   ├─ 2. 两段式生成（lib/generate.ts）
+   │      ① 选题：DeepSeek 从候选里挑 4-5 条 + 切入角度
+   │      ② 深挖：逐条抓原文全文 → 写正文（数字/对比表/清单）+ 怎么玩 + 点评草稿
+   │      ③ 收尾：汇总今日要点与小结；链接只允许取自素材
    │
    ├─ 3. 存储（lib/store.ts）
-   │      Vercel Blob：reports/YYYY-MM-DD.json（固定路径、公开读、可覆盖）
+   │      Vercel Blob：reports/YYYY-MM-DD.json，status=draft
    │
-   └─ 4. 邮件（lib/email.ts）
-          Resend 发内联样式 HTML 到收件人（claude@saveme505.help 发出）
+   └─ 4. 草稿邮件（lib/email.ts）
+          全文 + 「改点评并定稿」按钮 → /edit/[date]?key=ADMIN_KEY
+
+人工环节：/edit/[date] 逐条改 Leo 点评和小结 → 「定稿并发送邮件」
+          → status=final + Resend 正式日报邮件
 ```
 
 ## 页面
@@ -41,8 +46,10 @@ Vercel Cron（每日 09:30 北京时间）
 | 路由 | 说明 |
 | --- | --- |
 | `/` | 日报归档列表 |
-| `/r/[date]` | 单日日报（仿长图排版：要点、条目、点评引用块、小结） |
+| `/r/[date]` | 单日日报（仿长图排版；右下角「📷 导出长图」一键出 2x PNG 可发群） |
+| `/edit/[date]?key=…` | 人工审核页：改点评/小结，保存草稿或定稿发信 |
 | `/api/cron/daily` | 生成入口，`?date=YYYY-MM-DD&force=1` 可重跑指定日期 |
+| `/api/report/update` | 审核写回（save / finalize） |
 
 ## 本地开发
 
@@ -55,7 +62,7 @@ npm run dev                  # 本地预览（读线上 Blob 需 BLOB_READ_WRITE
 
 ## 环境变量
 
-见 `.env.example`：`DEEPSEEK_API_KEY` / `LLM_MODEL` / `RESEND_API_KEY` / `MAIL_TO` / `CRON_SECRET` / `BLOB_READ_WRITE_TOKEN`（连接 Blob store 后 Vercel 自动注入）/ `SITE_URL`。
+见 `.env.example`：`DEEPSEEK_API_KEY` / `LLM_MODEL` / `RESEND_API_KEY` / `MAIL_TO` / `CRON_SECRET` / `ADMIN_KEY`（审核页鉴权）/ `BLOB_READ_WRITE_TOKEN`（连接 Blob store 后 Vercel 自动注入）/ `SITE_URL`。
 
 ## 手动补一期
 

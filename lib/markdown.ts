@@ -17,10 +17,29 @@ function inline(s: string): string {
     );
 }
 
+// 管道表格行 → <tr>（带内联样式，邮件客户端也能正常显示）
+function tableRow(line: string, isHeader: boolean): string {
+  const cells = line
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((c) => c.trim());
+  const tag = isHeader ? "th" : "td";
+  const style = isHeader
+    ? "border:1px solid #e5e7eb;padding:6px 10px;background:#f3f4f6;text-align:left;font-size:13px;"
+    : "border:1px solid #e5e7eb;padding:6px 10px;font-size:13px;";
+  return `<tr>${cells.map((c) => `<${tag} style="${style}">${inline(c)}</${tag}>`).join("")}</tr>`;
+}
+
+const isTableLine = (l: string) => /^\|.*\|$/.test(l);
+const isTableSep = (l: string) => /^\|[\s\-:|]+\|$/.test(l);
+
 export function mdToHtml(md: string): string {
   const lines = md.split(/\r?\n/);
   const out: string[] = [];
   let listOpen = false;
+  let tableOpen = false;
+  let tableHeaderDone = false;
   let para: string[] = [];
 
   const flushPara = () => {
@@ -35,14 +54,39 @@ export function mdToHtml(md: string): string {
       listOpen = false;
     }
   };
+  const closeTable = () => {
+    if (tableOpen) {
+      out.push("</table></div>");
+      tableOpen = false;
+      tableHeaderDone = false;
+    }
+  };
 
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) {
       flushPara();
       closeList();
+      closeTable();
       continue;
     }
+    if (isTableLine(line)) {
+      flushPara();
+      closeList();
+      if (isTableSep(line)) continue; // 分隔行跳过
+      if (!tableOpen) {
+        out.push(
+          '<div style="overflow-x:auto;"><table style="border-collapse:collapse;margin:10px 0;width:100%;">',
+        );
+        tableOpen = true;
+        out.push(tableRow(line, true));
+        tableHeaderDone = true;
+      } else {
+        out.push(tableRow(line, !tableHeaderDone));
+      }
+      continue;
+    }
+    closeTable();
     if (/^[-*]\s+/.test(line)) {
       flushPara();
       if (!listOpen) {
@@ -57,5 +101,6 @@ export function mdToHtml(md: string): string {
   }
   flushPara();
   closeList();
+  closeTable();
   return out.join("\n");
 }
