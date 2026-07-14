@@ -19,6 +19,17 @@ export async function GET(req: NextRequest) {
   const date = req.nextUrl.searchParams.get("date") || beijingToday();
   const force = req.nextUrl.searchParams.get("force") === "1";
 
+  // 干跑：只采集信源、返回各源分布，不生成不发信不落盘（运维排查用）
+  if (req.nextUrl.searchParams.get("dry") === "1") {
+    const cs = await collectCandidates();
+    const bySource: Record<string, number> = {};
+    for (const c of cs) {
+      const k = c.source ?? c.from;
+      bySource[k] = (bySource[k] ?? 0) + 1;
+    }
+    return NextResponse.json({ ok: true, dry: true, total: cs.length, bySource });
+  }
+
   // 幂等：当天已有日报且未 force 时直接返回（cron 重试不重复烧 token）
   if (!force) {
     const existing = await getReport(date);

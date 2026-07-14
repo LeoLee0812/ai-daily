@@ -24,6 +24,8 @@ Vercel Cron（每日 09:30 北京时间）
    │      · 官方一手 RSS：OpenAI / Google AI / Google DeepMind
    │      · 科技媒体 RSS：TechCrunch AI / The Verge AI / VentureBeat AI /
    │        9to5Mac(AI过滤) / Ars Technica(AI过滤) / Simon Willison
+   │      · release 监控：Claude Code / OpenAI Codex / Gemini CLI / Ollama
+   │        (GitHub releases.atom) + Cursor changelog RSS
    │      · Hacker News Algolia API（近 24h 高分 AI 帖）
    │
    ├─ 2. 两段式生成（lib/generate.ts）

@@ -10,6 +10,8 @@ interface Feed {
   url: string;
   /** 是否只保留 AI 相关条目（综合媒体需要过滤，垂直源不用） */
   aiFilter: boolean;
+  /** release 监控源：标题补产品名前缀、每源最多 5 条 */
+  release?: boolean;
 }
 
 const FEEDS: Feed[] = [
@@ -25,6 +27,12 @@ const FEEDS: Feed[] = [
   { name: "Ars Technica", url: "https://feeds.arstechnica.com/arstechnica/index", aiFilter: true },
   // 独立观察者（AI 工具实操视角，和日报「怎么玩」气质接近）
   { name: "Simon Willison", url: "https://simonwillison.net/atom/everything/", aiFilter: false },
+  // release 监控：主流 AI 编程工具的版本发布（学 releasebot 的思路，直接盯一手 feed）
+  { name: "Claude Code", url: "https://github.com/anthropics/claude-code/releases.atom", aiFilter: false, release: true },
+  { name: "OpenAI Codex", url: "https://github.com/openai/codex/releases.atom", aiFilter: false, release: true },
+  { name: "Gemini CLI", url: "https://github.com/google-gemini/gemini-cli/releases.atom", aiFilter: false, release: true },
+  { name: "Ollama", url: "https://github.com/ollama/ollama/releases.atom", aiFilter: false, release: true },
+  { name: "Cursor", url: "https://cursor.com/changelog.rss", aiFilter: false, release: true },
 ];
 
 const AI_WORDS =
@@ -67,16 +75,21 @@ function parseFeed(xml: string, feed: Feed, sinceMs: number): Candidate[] {
     if (!Number.isNaN(ts) && ts < sinceMs) continue;
     const summary = (pick(b, "description") || pick(b, "summary") || pick(b, "content")).slice(0, 400);
     if (feed.aiFilter && !AI_WORDS.test(title + " " + summary)) continue;
+    // release 源的标题常是裸版本号（如 v2.1.3），补上产品名
+    const fullTitle =
+      feed.release && !title.toLowerCase().includes(feed.name.toLowerCase())
+        ? `${feed.name} 发布 ${title}`
+        : title;
     out.push({
-      title,
-      summary,
+      title: fullTitle,
+      summary: feed.release ? `版本更新。${summary}` : summary,
       url: link || undefined,
       source: feed.name,
       publishedAt: dateStr || undefined,
       from: "rss",
     });
   }
-  return out.slice(0, 12); // 每个源最多 12 条，防止刷屏
+  return out.slice(0, feed.release ? 5 : 12); // 防单源刷屏
 }
 
 async function fetchFeed(feed: Feed, sinceMs: number): Promise<Candidate[]> {
