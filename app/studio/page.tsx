@@ -1,6 +1,9 @@
-// 视频工作台入口：ADMIN_KEY 门禁（与 /edit 一致，?key= 校验）
+// 视频工作台入口：Cookie 登录态（/studio 直接访问出密码框），?key= 老方式仍兼容
 
+import { cookies } from "next/headers";
 import Workbench from "./workbench";
+import LoginForm from "./login-form";
+import { AUTH_COOKIE, verifyToken } from "@/lib/studio/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,12 +13,12 @@ export default async function StudioPage({
   searchParams: Promise<{ key?: string; date?: string }>;
 }) {
   const { key, date } = await searchParams;
-  if (!process.env.ADMIN_KEY || key !== process.env.ADMIN_KEY) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
-        需要访问密钥：/studio?key=ADMIN_KEY
-      </div>
-    );
-  }
-  return <Workbench adminKey={key!} initialDate={date} />;
+  const cookieStore = await cookies();
+  const authed =
+    verifyToken(cookieStore.get(AUTH_COOKIE)?.value) ||
+    (!!process.env.ADMIN_KEY && key === process.env.ADMIN_KEY);
+
+  if (!authed) return <LoginForm />;
+  // 登录态下把 ADMIN_KEY 交给客户端组件调后端 API（仅本人可见）
+  return <Workbench adminKey={process.env.ADMIN_KEY!} initialDate={date} />;
 }
