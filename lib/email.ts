@@ -75,13 +75,13 @@ async function send(subject: string, html: string): Promise<void> {
   }
 }
 
-// 草稿邮件：内容全文 + 审核提示（点评待改）
+// 草稿邮件：内容全文 + 审核提示（点评待填）
 export async function sendDraftEmail(report: DailyReport): Promise<void> {
   const editUrl = `${SITE}/edit/${report.date}?key=${process.env.ADMIN_KEY}`;
   const banner = `
   <div style="margin:0 0 18px;padding:12px 16px;background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;font-size:13.5px;color:#92400e;line-height:1.7;">
-    📝 <strong>今日草稿已生成</strong>——下面的「Leo 点评」是 AI 起草的，等你亲自过目。<br>
-    <a href="${editUrl}" style="display:inline-block;margin-top:8px;padding:8px 16px;background:#d97706;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">改点评并定稿 →</a>
+    📝 <strong>今日草稿已生成</strong>——请填写每条「Leo 点评」后定稿。<br>
+    <a href="${editUrl}" style="display:inline-block;margin-top:8px;padding:8px 16px;background:#d97706;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">填写点评并定稿 →</a>
   </div>`;
   await send(
     `[草稿待审] Leo 的 AI 日报 · ${report.date.replaceAll("-", "")}`,

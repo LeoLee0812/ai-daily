@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   if (Array.isArray(body.comments)) {
     report.items.forEach((it, i) => {
       const c = body.comments[i];
-      if (typeof c === "string" && c.trim()) it.comment = c.trim();
+      if (typeof c === "string") it.comment = c.trim();
     });
   }
   if (typeof body.summary === "string" && body.summary.trim()) {
