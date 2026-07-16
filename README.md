@@ -10,12 +10,12 @@
 灵感来自老卫（@imwsl90）的「AI 玩耍群日报」，逆向其形式后用自己的技术栈重建。
 
 - 线上地址：<https://daily.saveme505.help>
-- 每天北京时间 **09:30**（Vercel Cron `30 1 * * *` UTC）自动生成并发邮件
+- 每天北京时间 **08:40**（Vercel Cron `40 0 * * *` UTC）自动生成并发邮件；09:00 东京 VPS 的飞书 bot 播报当期到群里
 
 ## 工作流（v2：两段式生成 + 人工审核）
 
 ```
-Vercel Cron（每日 09:30 北京时间）
+Vercel Cron（每日 08:40 北京时间）
    │
    ▼
 /api/cron/daily（Bearer CRON_SECRET 鉴权，幂等：当天已有则跳过）

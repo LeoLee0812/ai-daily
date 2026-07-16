@@ -23,7 +23,8 @@
 
 ## Cron 与幂等
 
-- `vercel.json` cron：`30 1 * * *`（UTC）= 北京 09:30；Vercel 自动带 `Authorization: Bearer $CRON_SECRET` 调 `/api/cron/daily`
+- `vercel.json` cron：`40 0 * * *`（UTC）= 北京 08:40；Vercel 自动带 `Authorization: Bearer $CRON_SECRET` 调 `/api/cron/daily`
+  - 提前到 08:40 是为了给下游留时间：东京 VPS（`ssh tky`，`/root/night-run/daily_feishu.py`）09:00 经公开接口 `/api/report/latest` 取当期，用飞书 bot 播报到群里
 - 路由幂等：当天已有日报直接跳过；`?force=1` 强制重跑；`?date=` 补历史
 - 邮件失败只记日志不失败整个请求（日报已落盘）
 
