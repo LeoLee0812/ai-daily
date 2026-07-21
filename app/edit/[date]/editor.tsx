@@ -78,9 +78,15 @@ export default function Editor({
             </strong>
           </div>
           <div
-            style={{ fontSize: 13, color: "var(--d-muted)", marginBottom: 8 }}
+            style={{
+              fontSize: 13,
+              color: "var(--d-muted)",
+              marginBottom: 8,
+              lineHeight: 1.7,
+              whiteSpace: "pre-wrap",
+            }}
           >
-            {it.body.slice(0, 120)}…
+            {it.body}
           </div>
           <textarea
             style={ta}
