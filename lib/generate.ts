@@ -3,8 +3,8 @@
 // 第二段：逐条抓原文全文，DeepSeek 深挖成完整条目；Leo 点评由人工填写
 // 收尾：汇总生成今日要点与小结
 
-import { createDeepSeek } from "@ai-sdk/deepseek";
 import { generateObject } from "ai";
+import { getModel } from "./model";
 import { z } from "zod";
 import type { Candidate, DailyItem, DailyReport } from "./types";
 import { fetchArticleText } from "./sources";
@@ -15,11 +15,6 @@ const PERSONA = `你是「Leo 的 AI 日报」主编。Leo 的人设：在读研
 - 全程简体中文，克制使用 emoji
 - 只写素材里真实出现的事实、数字和链接，不许编造
 - 避免 AI 腔：不用"值得注意的是""总的来说""赋能""重磅"这类词`;
-
-function model() {
-  const deepseek = createDeepSeek({ apiKey: process.env.DEEPSEEK_API_KEY! });
-  return deepseek(process.env.LLM_MODEL || "deepseek-chat");
-}
 
 // ---------- 第一段：选题 ----------
 
@@ -46,7 +41,7 @@ async function pickTopics(date: string, candidates: Candidate[]) {
     .join("\n");
 
   const { object } = await generateObject({
-    model: model(),
+    model: getModel(),
     schema: pickSchema,
     system: PERSONA,
     prompt: `今天是 ${date}。从以下过去 24 小时的候选素材中选出最值得深挖的 4-5 条做今日日报。
@@ -77,7 +72,7 @@ async function deepDive(
 ): Promise<Omit<DailyItem, "rank">> {
   const article = candidate.url ? await fetchArticleText(candidate.url) : "";
   const { object } = await generateObject({
-    model: model(),
+    model: getModel(),
     schema: itemSchema,
     system: PERSONA,
     prompt: `请把下面这条新闻写成日报条目。切入角度：${angle}
@@ -111,7 +106,7 @@ async function wrapUp(items: Array<Omit<DailyItem, "rank">>) {
     .map((it, i) => `${i + 1}. ${it.title}\n${it.body.slice(0, 200)}`)
     .join("\n\n");
   const { object } = await generateObject({
-    model: model(),
+    model: getModel(),
     schema: wrapSchema,
     system: PERSONA,
     prompt: `以下是今天日报的全部条目，请写「今日要点」和「今日小结」：\n\n${digest}`,

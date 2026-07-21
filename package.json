@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^2.0.0",
+    "@ai-sdk/openai-compatible": "^2.0.62",
     "@base-ui/react": "^1.6.0",
     "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/postcss": "^4.3.2",

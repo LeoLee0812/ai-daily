@@ -1,17 +1,12 @@
 // 口播稿生成：DeepSeek 把勾选素材写成「开场白 + 逐事件口播段 + 卡片要点 + 结束语」
 // 逆向自橘鸦 AI 早报：口播稿按新闻事件分段，画面是 NotebookLM 风格知识卡片墙
 
-import { createDeepSeek } from "@ai-sdk/deepseek";
 import { generateObject } from "ai";
+import { getModel } from "../model";
 import { z } from "zod";
 import type { StudioMaterial, VideoScript } from "./types";
 
 const PERSONA = `你是「Leo 的 AI 日报」视频版的口播稿撰稿人。风格参考专业科技新闻播客：口语化但信息密度高，全程简体中文，数字和产品名精确，不用"值得注意的是""总的来说""赋能"这类 AI 腔，不用 emoji。`;
-
-function model() {
-  const deepseek = createDeepSeek({ apiKey: process.env.DEEPSEEK_API_KEY! });
-  return deepseek(process.env.LLM_MODEL || "deepseek-chat");
-}
 
 const scriptSchema = z.object({
   intro: z
@@ -63,7 +58,7 @@ export async function generateVideoScript(
     .join("\n\n");
 
   const { object } = await generateObject({
-    model: model(),
+    model: getModel(),
     schema: scriptSchema,
     system: PERSONA,
     prompt: `今天是 ${date}（星期${weekday}）。请把以下 ${materials.length} 条素材逐条写成视频口播稿，事件顺序与素材顺序一致，每条素材对应一个事件。只写素材里真实出现的事实和数字，不许编造。

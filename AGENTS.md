@@ -1,6 +1,6 @@
 # ai-daily — Leo 的 AI 日报
 
-全自动 AI 日报流水线：采集信源 → DeepSeek 撰写 → Vercel Blob 归档 → Resend 邮件。上线于 **daily.saveme505.help**。形式逆向自老卫（@imwsl90）的「AI 玩耍群日报」。
+全自动 AI 日报流水线：采集信源 → LLM 撰写 → Vercel Blob 归档 → Resend 邮件。上线于 **daily.saveme505.help**。形式逆向自老卫（@imwsl90）的「AI 玩耍群日报」。
 
 ## 技术栈与架构决策
 
@@ -23,8 +23,7 @@
 
 ## Cron 与幂等
 
-- `vercel.json` cron：`40 0 * * *`（UTC）= 北京 08:40；Vercel 自动带 `Authorization: Bearer $CRON_SECRET` 调 `/api/cron/daily`
-  - 提前到 08:40 是为了给下游留时间：东京 VPS（`ssh tky`，`/root/night-run/daily_feishu.py`）09:00 经公开接口 `/api/report/latest` 取当期，用飞书 bot 播报到群里
+- `vercel.json` cron：`30 1 * * *`（UTC）= 北京 09:30；Vercel 自动带 `Authorization: Bearer $CRON_SECRET` 调 `/api/cron/daily`
 - 路由幂等：当天已有日报直接跳过；`?force=1` 强制重跑；`?date=` 补历史
 - 邮件失败只记日志不失败整个请求（日报已落盘）
 
@@ -33,7 +32,7 @@
 ```
 app/api/cron/daily/route.ts  生成入口（鉴权+幂等+采集+生成+存储+邮件）
 app/page.tsx                 归档列表    app/r/[date]/page.tsx  单日日报页
-lib/sources.ts   信源采集     lib/generate.ts  DeepSeek 生成（人设+反AI腔在 SYSTEM）
+lib/sources.ts   信源采集     lib/generate.ts  LLM 生成（人设+反AI腔在 SYSTEM）
 lib/store.ts     Blob 存取    lib/email.ts     邮件渲染+Resend 发送
 lib/markdown.ts  极简 md→html（页面与邮件共用）
 scripts/generate-local.mts   本地试跑（npm run gen，落盘 tmp/）
@@ -53,7 +52,7 @@ vercel env ls            # 核对线上环境变量
 
 ## 视频工作台（v3，逆向自橘鸦 AI 早报）
 
-- `/studio?key=ADMIN_KEY`：选素材（当日日报条目+实时信源，勾选≤10条）→ DeepSeek 生成口播稿（开场/逐事件/结尾+卡片要点）→ 逐句火山 TTS 定时间轴 → satori 卡片 + sharp 字幕帧 + ffmpeg 成片
+- `/studio?key=ADMIN_KEY`：选素材（当日日报条目+实时信源，勾选≤10条）→ LLM 生成口播稿（开场/逐事件/结尾+卡片要点）→ 逐句火山 TTS 定时间轴 → satori 卡片 + sharp 字幕帧 + ffmpeg 成片
 - **画面不走浏览器截图**：卡片用 satori(flexbox)+resvg 纯 Node 渲染，1920x1080 NotebookLM 风（米杏底 #F7F3EC + 玫红标题 #E0537A + 白底黑框要点卡），字幕预合成进帧，进度条用 ffmpeg overlay x 表达式
 - 字体：`assets/fonts/` 是 GB2312 子集化的 Noto Sans SC（1.8MB/枚），别删；next.config 的 `outputFileTracingIncludes` 带上了字体和 ffmpeg 二进制
 - 数据：Blob `videos/YYYY-MM-DD/`（job.json 状态机 script→audio→rendering→done + audio/*.mp3 + 成片/SRT）
